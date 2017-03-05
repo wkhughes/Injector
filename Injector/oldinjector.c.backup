@@ -1,0 +1,177 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <stdio.h>
+#include <commctrl.h>
+#include <tlhelp32.h>
+#include "Injection.h"
+
+#if defined _M_IX86
+	#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='x86' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#elif defined _M_IA64
+	#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='ia64' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#elif defined _M_X64
+	#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='amd64' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#else
+	#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#endif
+
+#define IDC_PROCESS_LIST 101
+#define IDC_REFRESH_PROCESS_LIST 102
+
+const char g_windowClassName[] = "windowClass";
+HINSTANCE g_instance = NULL;
+
+BOOL CALLBACK applyDefaultFont(HWND window, LPARAM lParam)
+{
+	NONCLIENTMETRICS nonClientMetrics;
+	HFONT font;
+
+	nonClientMetrics.cbSize = sizeof(NONCLIENTMETRICS);
+
+	if (!SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(NONCLIENTMETRICS), &nonClientMetrics, 0))
+	{
+		return FALSE;
+	}
+
+	font = CreateFontIndirect(&nonClientMetrics.lfMessageFont);
+	SendMessage(window, WM_SETFONT, (WPARAM)font, MAKELPARAM(TRUE, 0));
+
+	return TRUE;
+}
+
+BOOL populateProcessList(HWND window)
+{
+	PROCESSENTRY32 processList[1024];
+	unsigned int processCount;
+	unsigned int i;
+
+	if (!getProcessList(processList, 1024, &processCount))
+	{
+		return FALSE;
+	}
+
+	SendDlgItemMessage(window, IDC_PROCESS_LIST, LB_RESETCONTENT, 0, 0);
+
+	for (i = processCount; i-- > 0; )
+	{
+		char processDescriptor[256];
+
+		sprintf_s(processDescriptor, 256, "%s [%08X]", processList[i].szExeFile, processList[i].th32ProcessID);
+		SendDlgItemMessage(window, IDC_PROCESS_LIST, LB_ADDSTRING, 0, (LPARAM)processDescriptor);
+	}
+
+	return TRUE;
+}
+
+void createControls(HWND window)
+{
+	int processPaneHeight = 300;
+	int refreshButtonWidth = 125;
+	RECT drawing;
+
+	GetClientRect(window, &drawing);
+
+	drawing.left +=10;
+	drawing.top += 10;
+	drawing.right -= 20;
+
+	// Pane
+	CreateWindowEx(0, "BUTTON", "Available Processes", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, drawing.left, drawing.top, drawing.right, processPaneHeight, window, (HMENU)IDC_REFRESH_PROCESS_LIST, g_instance, NULL);
+
+	// Process list
+	CreateWindowEx(0, "LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL, drawing.left + 10, drawing.top + 20, drawing.right - 20, processPaneHeight - 58, window, (HMENU)IDC_PROCESS_LIST, g_instance, NULL);
+	populateProcessList(window);
+
+	// Refresh process list button
+	CreateWindowEx(0, "BUTTON", "Refresh", WS_CHILD | WS_VISIBLE, drawing.right - refreshButtonWidth - 10, drawing.top + processPaneHeight - 25 - 10, refreshButtonWidth, 25, window, (HMENU)IDC_REFRESH_PROCESS_LIST, g_instance, NULL);
+}
+
+LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+		case WM_CREATE:
+		{
+			createControls(window);
+			EnumChildWindows(window, applyDefaultFont, 0);
+			break;
+		}
+
+		case WM_COMMAND:
+			switch (LOWORD(wParam))
+			{
+				case IDC_REFRESH_PROCESS_LIST:
+					populateProcessList(window);
+					break;
+
+				default:
+					break;
+			}
+
+			break;
+
+		case WM_CLOSE:
+			DestroyWindow(window);
+			break;
+
+		case WM_DESTROY:
+			PostQuitMessage(0);
+			break;
+
+		default:
+			return DefWindowProc(window, message, wParam, lParam);
+	}
+
+	return 0;
+}
+
+int WINAPI WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand)
+{
+	WNDCLASSEX windowClass;
+	HWND window;
+	MSG message;
+	ATOM registeredClass;
+
+	g_instance = instance;
+
+	windowClass.cbSize = sizeof(WNDCLASSEX);
+	windowClass.style = 0;
+	windowClass.lpfnWndProc = windowProcedure;
+	windowClass.cbClsExtra = 0;
+	windowClass.cbWndExtra = 0;
+	windowClass.hInstance = g_instance;
+	windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	windowClass.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+	windowClass.lpszMenuName = NULL;
+	windowClass.lpszClassName = g_windowClassName;
+	windowClass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+
+	registeredClass = RegisterClassEx(&windowClass);
+
+	if (registeredClass == 0)
+	{
+		MessageBox(NULL, "Window registration failed", "Error", MB_ICONEXCLAMATION | MB_OK);
+		return 0;
+	}
+
+	window = CreateWindowEx(WS_EX_CLIENTEDGE, g_windowClassName, "Window Title", WS_OVERLAPPEDWINDOW & ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME), 
+		CW_USEDEFAULT, CW_USEDEFAULT, 800, 520, NULL, NULL, g_instance, NULL);
+
+	if (window == NULL)
+	{
+		MessageBox(NULL, "Window creation failed", "Error", MB_ICONEXCLAMATION | MB_OK);
+		return 0;
+	}
+
+	ShowWindow(window, showCommand);
+	UpdateWindow(window);
+
+	while (GetMessage(&message, NULL, 0, 0) > 0)
+	{
+		TranslateMessage(&message);
+		DispatchMessage(&message);
+	}
+
+	return message.wParam;
+}

@@ -1,0 +1,39 @@
+#ifndef IDC_STATIC
+#define IDC_STATIC (-1)
+#endif
+
+#define IDR_MENU                                102
+#define IDD_INJECTOR                            103
+#define IDD_OPTIONS                             105
+#define IDD_CODE_CHANGES                        107
+#define IDR_CONTEXT                             109
+#define IDC_REMEMBER_TARGET                     1000
+#define IDC_TARGET_ICON                         1001
+#define IDC_OPERATION_STATUS                    1003
+#define IDC_PROCESS_LIST                        1005
+#define IDM_INJECT                              40000
+#define IDM_SELECT_ALL                          40000
+#define IDM_EXIT                                40001
+#define IDM_CODE_CHANGES                        40002
+#define IDM_EJECT                               40003
+#define IDM_OPTIONS                             40004
+#define IDM_ABOUT                               40005
+#define IDM_PROCESS_REFRESH                     40006
+#define IDC_SELECT                              40017
+#define IDC_INJECT                              40018
+#define IDC_EJECT                               40019
+#define IDC_DLL                                 40020
+#define IDC_PROCESS_REFRESH                     40022
+#define IDM_COPY                                40033
+#define IDC_TARGET_PROCESS                      40034
+#define IDC_REMEMBER_DLL                        40035
+#define IDC_TARGET_STATUS                       40035
+#define IDC_HOTKEY_INJECT                       40036
+#define IDC_DLL_STATUS                          40037
+#define IDC_HOTKEY_EJECT                        40037
+#define IDC_MODULE_LIST                         40042
+#define IDC_CODE_CHANGE_LIST                    40043
+#define IDC_RECORD_CODE                         40044
+#define IDC_FIND_CHANGES                        40045
+#define IDC_PROCESS                             40046
+#define ID_RESET                                40048
