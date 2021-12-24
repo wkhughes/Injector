@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <tlhelp32.h>
 #include "Injection.h"
+#include "Utility.h"
 
-DWORD injectDll(DWORD processId, const char* dllPath)
+void* injectDll(DWORD processId, const char* dllPath)
 {
-    DWORD injectedDllBase = -1;    
+    void* injectedDllBase = -1;
     HANDLE processHandle;
 
     // Get access to the process
@@ -22,9 +23,9 @@ DWORD injectDll(DWORD processId, const char* dllPath)
 
             if (loadLibrary != NULL)
             {
-                DWORD bytesWritten;
+                size_t bytesWritten;
                 void* remotePathAddress;
-                unsigned int dllPathLength = strlen(dllPath) + 1;
+                size_t dllPathLength = strlen(dllPath) + 1;
 
                 // Alocate memory of the dll path size in the remote process 
                 // and store the address where dllPath will be written to in remotePathAddress
@@ -45,11 +46,10 @@ DWORD injectDll(DWORD processId, const char* dllPath)
 
                         if (remoteThreadHandle != NULL)
                         {
-                            // Wait for LoadLibrary in the remote process to finish then store the thread exit code
-                            // which will be the return value of LoadLibrary, the module handle
+                            // Wait for LoadLibrary in the remote process to finish then find the injected module base
                             if (WaitForSingleObject(remoteThreadHandle, INFINITE) != WAIT_FAILED)
                             {
-                                GetExitCodeThread(remoteThreadHandle, &injectedDllBase);
+                                getProcessModuleBase(getFileNameFromPath(dllPath), processId, &injectedDllBase);
                             }
 
                             CloseHandle(remoteThreadHandle);
@@ -68,7 +68,7 @@ DWORD injectDll(DWORD processId, const char* dllPath)
     return injectedDllBase;
 }
 
-BOOL ejectDll(DWORD processId, DWORD dllBase)
+BOOL ejectDll(DWORD processId, void* dllBase)
 {
     BOOL ejected = FALSE;    
     HANDLE processHandle;
@@ -85,7 +85,7 @@ BOOL ejectDll(DWORD processId, DWORD dllBase)
 
             if (freeLibrary != NULL)
             {
-                HANDLE remoteThreadHandle = CreateRemoteThread(processHandle, NULL, 0, (LPTHREAD_START_ROUTINE)freeLibrary, (void*)dllBase, 0, NULL);
+                HANDLE remoteThreadHandle = CreateRemoteThread(processHandle, NULL, 0, (LPTHREAD_START_ROUTINE)freeLibrary, dllBase, 0, NULL);
 
                 if (remoteThreadHandle != NULL)
                 {
@@ -161,7 +161,7 @@ BOOL getProcessList(PROCESSENTRY32* processList, size_t processListSize, unsigne
     return TRUE;
 }
 
-BOOL getProcessModuleBase(const char* moduleName, DWORD processId, DWORD* base)
+BOOL getProcessModuleBase(const char* moduleName, DWORD processId, void** base)
 {
     HANDLE snapshot;
     MODULEENTRY32 moduleEntry;
@@ -184,7 +184,7 @@ BOOL getProcessModuleBase(const char* moduleName, DWORD processId, DWORD* base)
         {
             if (base != NULL)
             {
-                *base = (DWORD)moduleEntry.hModule;
+                *base = moduleEntry.hModule;
             }
 
             CloseHandle(snapshot);

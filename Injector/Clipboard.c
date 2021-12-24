@@ -8,7 +8,7 @@ BOOL setClipboardText(char* text)
     {
         if (EmptyClipboard())
         {
-            const unsigned int textLength = strlen(text) + 1;
+            const size_t textLength = strlen(text) + 1;
             HGLOBAL clipboardMemory = GlobalAlloc(GMEM_FIXED, textLength);
 
             if (clipboardMemory != NULL)

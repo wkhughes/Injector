@@ -36,7 +36,7 @@ static Settings g_settings = {TRUE, TRUE, MAKEWORD(VK_ADD, 0), MAKEWORD(VK_SUBTR
 static Process g_processes[MAX_PROCESSES];
 static Process g_targetProcess;
 
-static DWORD g_injectedDllBase = -1;
+static void* g_injectedDllBase = -1;
 static unsigned int g_processCount = 0;
 static BOOL g_hasTargetProcess = FALSE;
 
@@ -306,7 +306,7 @@ BOOL inject()
     HWND selectedDll = GetDlgItem(g_window, IDC_DLL);
     HWND dllStatus = GetDlgItem(g_window, IDC_DLL_STATUS);
     char dllPathText[MAX_PATH] = "";
-    DWORD existingModuleBase;
+    void* existingModuleBase;
 
     // Refresh in case target process wasn't active and now is
     refresh();
@@ -348,12 +348,12 @@ BOOL inject()
         char statusText[128];
 
         g_injectedDllBase = existingModuleBase;
-        sprintf_s(statusText, sizeof(statusText), "Module already loaded at base %08X", existingModuleBase);
+        sprintf_s(statusText, sizeof(statusText), "Module already loaded at base %p", existingModuleBase);
         SetWindowText(dllStatus, statusText);
     }
     else
     {
-        DWORD dllBase;
+        void* dllBase;
         
         SetWindowText(dllStatus, "Injecting...");
         UpdateWindow(dllStatus);
@@ -373,7 +373,7 @@ BOOL inject()
             char statusText[128];
 
             g_injectedDllBase = dllBase;
-            sprintf_s(statusText, sizeof(statusText), "Successfully injected at base %08X", dllBase);
+            sprintf_s(statusText, sizeof(statusText), "Successfully injected at base 0x%p", dllBase);
             SetWindowText(dllStatus, statusText);
         }
     }
@@ -385,7 +385,7 @@ BOOL eject()
 {
     HWND selectedDll = GetDlgItem(g_window, IDC_DLL);
     HWND dllStatus = GetDlgItem(g_window, IDC_DLL_STATUS);
-    DWORD existingModuleBase;
+    void* existingModuleBase;
     char dllPathText[MAX_PATH];
 
     if (selectedDll == NULL || dllStatus == NULL)
