@@ -6,60 +6,81 @@
 
 void* injectDll(DWORD processId, const char* dllPath)
 {
-    void* injectedDllBase = -1;
-    HANDLE processHandle;
+    void* injectedDllBase = 0;
+    HANDLE processHandle = NULL;
+    HMODULE kernel32Handle = NULL;
+    FARPROC loadLibrary;
+    size_t bytesWritten;
+    void* remotePathAddress = NULL;
+    size_t dllPathLength = strlen(dllPath) + 1;
+    HANDLE remoteThreadHandle = NULL;
 
     // Get access to the process
     processHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
+    if (processHandle == NULL)
+    {
+        injectedDllBase = INJECT_ERR_OPEN_PROCESS;
+        goto cleanup;
+    }
+
+    // Get the address of the LoadLibraryA function in kernel32.dll
+    kernel32Handle = GetModuleHandle("kernel32.dll");
+    if (kernel32Handle == NULL)
+    {
+        injectedDllBase = INJECT_ERR_GET_KERNEL32_DLL;
+        goto cleanup;
+    }
+
+    loadLibrary = GetProcAddress(kernel32Handle, "LoadLibraryA");
+    if (loadLibrary == NULL)
+    {
+        injectedDllBase = INJECT_ERR_GET_LOAD_LIBRARY_ADDRESS;
+        goto cleanup;
+    }
+
+    // Alocate memory of the dll path size in the remote process 
+    // and store the address where dllPath will be written to in remotePathAddress
+    remotePathAddress = VirtualAllocEx(processHandle, NULL, dllPathLength, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (remotePathAddress == NULL)
+    {
+        injectedDllBase = INJECT_ERR_VIRTUAL_ALLOC;
+        goto cleanup;
+    }
+
+    // Write the dll path to the allocated memory
+    WriteProcessMemory(processHandle, remotePathAddress, dllPath, dllPathLength, &bytesWritten);
+    if (bytesWritten == 0)
+    {
+        injectedDllBase = INJECT_ERR_WRITE_PROCESS_MEMORY;
+        goto cleanup;
+    }    
+
+    // Create a thread in the remote process that starts at the LoadLibrary function,
+    // and passes in the dllPath string as the argument, making the remote process call LoadLibrary on our dll
+    remoteThreadHandle = CreateRemoteThread(processHandle, NULL, 0, (LPTHREAD_START_ROUTINE)loadLibrary, remotePathAddress, 0, NULL);
+    if (remoteThreadHandle == NULL)
+    {
+        injectedDllBase = INJECT_ERR_CREATE_REMOTE_THREAD;
+        goto cleanup;
+    }
+
+    // Wait for LoadLibrary in the remote process to finish then find the injected module base
+    if (WaitForSingleObject(remoteThreadHandle, INFINITE) != WAIT_FAILED)
+    {
+        getProcessModuleBase(getFileNameFromPath(dllPath), processId, &injectedDllBase);
+    }
+
+cleanup:
+    if (remoteThreadHandle != NULL)
+    {
+        CloseHandle(remoteThreadHandle);
+    }
 
     if (processHandle != NULL)
     {
-        // Get the address of the LoadLibraryA function in kernel32.dll
-        HMODULE kernel32Handle = GetModuleHandle("kernel32.dll");
-
-        if (kernel32Handle != NULL)
+        if (remotePathAddress != NULL)
         {
-            FARPROC loadLibrary = GetProcAddress(kernel32Handle, "LoadLibraryA");
-
-            if (loadLibrary != NULL)
-            {
-                size_t bytesWritten;
-                void* remotePathAddress;
-                size_t dllPathLength = strlen(dllPath) + 1;
-
-                // Alocate memory of the dll path size in the remote process 
-                // and store the address where dllPath will be written to in remotePathAddress
-                remotePathAddress = VirtualAllocEx(processHandle, NULL, dllPathLength, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
-                if (remotePathAddress != NULL)
-                {
-                    // Write the dll path to the allocated memory
-                    WriteProcessMemory(processHandle, remotePathAddress, dllPath, dllPathLength, &bytesWritten);
-
-                    if (bytesWritten != 0)
-                    {
-                        HANDLE remoteThreadHandle;
-
-                        // Create a thread in the remote process that starts at the LoadLibrary function,
-                        // and passes in the dllPath string as the argument, making the remote process call LoadLibrary on our dll
-                        remoteThreadHandle = CreateRemoteThread(processHandle, NULL, 0, (LPTHREAD_START_ROUTINE)loadLibrary, remotePathAddress, 0, NULL);
-
-                        if (remoteThreadHandle != NULL)
-                        {
-                            // Wait for LoadLibrary in the remote process to finish then find the injected module base
-                            if (WaitForSingleObject(remoteThreadHandle, INFINITE) != WAIT_FAILED)
-                            {
-                                getProcessModuleBase(getFileNameFromPath(dllPath), processId, &injectedDllBase);
-                            }
-
-                            CloseHandle(remoteThreadHandle);
-                        }
-                    }
-
-                    // Free the allocated memory
-                    VirtualFreeEx(processHandle, remotePathAddress, 0, MEM_RELEASE);
-                }
-            }
+            VirtualFreeEx(processHandle, remotePathAddress, 0, MEM_RELEASE);
         }
 
         CloseHandle(processHandle);

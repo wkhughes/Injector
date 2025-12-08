@@ -359,10 +359,14 @@ BOOL inject()
         UpdateWindow(dllStatus);
         dllBase = injectDll(g_targetProcess.processId, dllPathText);
 
-        if (dllBase == -1)
+        if (dllBase < 0)
         {
-            SetWindowText(dllStatus, "Injection failed");
-            MessageBox(g_window, "Injection Failed", "Error", MB_OK | MB_ICONWARNING);
+            char errorText[128];
+
+            sprintf_s(errorText, sizeof(errorText), "Failed to inject, error %p", dllBase);
+
+            SetWindowText(dllStatus, errorText);
+            MessageBox(g_window, errorText, "Error", MB_OK | MB_ICONWARNING);
         }
         else if (dllBase == 0)
         {
