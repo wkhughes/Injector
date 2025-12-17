@@ -451,7 +451,8 @@ BOOL CALLBACK injectorDialogProcedure(HWND window, UINT message, WPARAM wParam, 
 
             g_window = window;
 
-            SendMessage(window, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(NULL, IDI_APPLICATION));
+            SendMessage(window, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(g_instance, MAKEINTRESOURCE(IDI_INJECTOR)));
+            SendMessage(window, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(g_instance, MAKEINTRESOURCE(IDI_INJECTOR)));
             EnumChildWindows(window, applyDefaultFont, 0);
 
             if (!enableDebugPrivileges())

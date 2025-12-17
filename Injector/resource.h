@@ -37,3 +37,4 @@
 #define IDC_FIND_CHANGES                        40045
 #define IDC_PROCESS                             40046
 #define ID_RESET                                40048
+#define IDI_INJECTOR                            101
