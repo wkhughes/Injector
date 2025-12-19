@@ -87,5 +87,11 @@
     <Image Include="Injector.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="Injector32.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Injector64.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
